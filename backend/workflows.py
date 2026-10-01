@@ -263,10 +263,13 @@ def _coach(state: LearningTask) -> LearningTask:
             "(null when code would not teach this concept, otherwise {language, code, explanation, tryIt}; code must be plain source without markdown fences), "
             "and miniProject ({title, brief, steps (3-5 strings), stretchGoal}). Do not return resource URLs; "
             "the app adds vetted resources. Keep the example and project specific to the concept and learner level. "
-            "Avoid filler and do not assume prior knowledge beyond the provided level."
+            "Avoid filler and do not assume prior knowledge beyond the provided level. Use topicPerformance: "
+            "if recent scores are low, add a simpler worked example and prerequisite check; if two recent scores "
+            "are 80 or higher, use a deeper applied example."
         ),
         "practice_prompt": (
-            "Create an interactive practice set for this specific concept and learner level. Return JSON with title, "
+            "Create an interactive practice set for this specific concept and learner level. Use performance history "
+            "to adjust challenge: recent low scores mean scaffolded practice; repeated high scores mean transfer/application. Return JSON with title, "
             "prompt, options (exactly four concise strings for the main multiple-choice question), minutes (integer), "
             "difficulty, and activities: an array with exactly three activities, one each of type explain, scenario, "
             "and order. Every activity has id, type, title, and prompt. Scenario also has exactly three options. "
@@ -291,6 +294,13 @@ def _coach(state: LearningTask) -> LearningTask:
         output = call_llm_for_json(prompts[action], str(data))
         if action == "onboarding_questions" and not _valid_questions(output):
             output = _fallback_questions(data)
+        if action == "practice":
+            if not isinstance(output, dict) or not isinstance(output.get("correct"), bool):
+                raise ValueError("Practice grader returned an invalid result")
+            score = output.get("scorePercent")
+            if not isinstance(score, (int, float)) or not 0 <= score <= 100:
+                raise ValueError("Practice grader returned an invalid score")
+            output = {**output, "scorePercent": int(score), "scored": True}
     except Exception:
         if action == "onboarding_questions":
             output = _fallback_questions(data)
@@ -304,7 +314,7 @@ def _coach(state: LearningTask) -> LearningTask:
             title = concept.get("title", "this concept")
             output = {"title": f"Check your understanding: {title}", "prompt": f"Which statement best describes {title}?", "options": ["Use the concept to solve a specific problem and check the result", "Choose the most complex tool before defining the problem", "Assume the first output is always correct", "Skip evaluation and explanation"], "minutes": 8, "difficulty": data.get("level", "beginner")}
         elif action == "practice":
-            output = {"correct": True, "scorePercent": 70, "feedback": "Your response was recorded. Compare it with the prompt and explain the key idea in your own words.", "nextStep": "Review the lesson and try another example."}
+            output = {"correct": False, "scorePercent": 0, "scored": False, "feedback": "Your response was saved, but I couldn't reliably score it because the grader is unavailable. Try again later for scored feedback.", "nextStep": "Review the lesson and retry this practice when scoring is available."}
         elif action == "diagnostic":
             output = {"evaluatedLevel": data.get("claimedLevel", "developing"), "accuracyPercent": 50, "strengths": [], "focusAreas": [data.get("topic", "AI")], "message": "We saved your response; use lesson practice to sharpen this estimate."}
         else:

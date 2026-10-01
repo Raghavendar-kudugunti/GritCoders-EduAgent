@@ -14,6 +14,21 @@ TRACK_RESOURCES = {
     "mlops": [{"title": "Google Machine Learning Crash Course", "url": "https://developers.google.com/machine-learning/crash-course", "kind": "Interactive course", "description": "Choose the production ML systems module for deployment and monitoring concepts."}],
 }
 
+INDIA_SCHOOL_DATA_PROJECT = {
+    "title": "Explore India’s school infrastructure data",
+    "source": "data.gov.in · UDISE+ 2023–24",
+    "url": "https://www.data.gov.in/resource/stateuts-wise-number-schools-all-types-management-and-school-category-during-2023-24",
+    "brief": "Use the official state/UT school-count table to practice inspecting, cleaning, summarizing, and visualizing real tabular data.",
+    "steps": [
+        "Open the official resource and download its CSV. Read the notes and column names before analyzing it.",
+        "Load the file with pandas; inspect missing values, numeric types, and the difference between total and category columns.",
+        "Compare state/UT totals or school categories and make a labeled chart that can be checked against the source table.",
+        "Write one evidence-based observation and one limitation. This is an aggregate 2023–24 snapshot, not student-level data or a measure of learning outcomes.",
+    ],
+    "stretchGoal": "Repeat the analysis with a second year only if you find a comparable source, then explain any changes in definitions before comparing values.",
+    "note": "Attribute the Ministry of Education/UDISE+ source and follow the dataset’s displayed terms. Do not infer school quality or student achievement from school counts.",
+}
+
 
 FALLBACK_CODE = {
     "python": {"language": "python", "code": "values = [2, 4, 6]\naverage = sum(values) / len(values)\nprint(average)", "explanation": "A tiny runnable example: a list is input, sum and len compute a summary, and print shows the result.", "tryIt": "Change one value and predict the new average before running it."},
@@ -32,6 +47,13 @@ def lesson_extras(concept: dict) -> dict:
     description = concept.get("description", "Explore the concept and test it with an example.")
     code = FALLBACK_CODE.get(track_id)
     resources = list(TRACK_RESOURCES.get(track_id, TRACK_RESOURCES["foundations"]))
+    if track_id in {"dataEngineering", "machineLearning"}:
+        resources.append({
+            "title": "UDISE+ school infrastructure data (2023–24)",
+            "url": INDIA_SCHOOL_DATA_PROJECT["url"],
+            "kind": "India public dataset",
+            "description": "An optional real-data exercise in inspecting, summarizing, and visualizing state/UT school counts.",
+        })
     resources.append({
         "title": f"Video search: {title}",
         "url": f"https://www.youtube.com/results?search_query={quote_plus(title + ' visual explanation tutorial')}",
@@ -58,6 +80,7 @@ def lesson_extras(concept: dict) -> dict:
             "stretchGoal": "Add a visual comparison that shows how changing one input affects the result.",
         },
         "recommendedResources": resources,
+        "publicDataProject": INDIA_SCHOOL_DATA_PROJECT if track_id in {"dataEngineering", "machineLearning"} else None,
     }
 
 
@@ -85,4 +108,6 @@ def enrich_lesson(concept: dict, lesson: dict) -> dict:
         enriched["miniProject"] = defaults["miniProject"]
     if not isinstance(enriched.get("recommendedResources"), list) or not enriched["recommendedResources"]:
         enriched["recommendedResources"] = defaults["recommendedResources"]
+    if defaults.get("publicDataProject"):
+        enriched["publicDataProject"] = defaults["publicDataProject"]
     return enriched

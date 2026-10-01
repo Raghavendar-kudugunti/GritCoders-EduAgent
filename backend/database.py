@@ -2,7 +2,7 @@ import os
 from collections.abc import Generator
 
 from fastapi import HTTPException
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -42,6 +42,7 @@ class PracticeRecord(Base):
     score_percent: Mapped[int] = mapped_column(Integer, nullable=False)
     feedback: Mapped[str] = mapped_column(String, nullable=False)
     next_step: Mapped[str] = mapped_column(String, nullable=False)
+    scored: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -129,6 +130,10 @@ def init_database() -> None:
     _engine = create_engine(_database_url(), pool_pre_ping=True)
     _session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
     Base.metadata.create_all(_engine)
+    # create_all does not add columns to existing tables. This additive migration
+    # keeps existing local Postgres databases compatible with scored analytics.
+    with _engine.begin() as connection:
+        connection.execute(text("ALTER TABLE practice_attempts ADD COLUMN IF NOT EXISTS scored BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
 def close_database() -> None:

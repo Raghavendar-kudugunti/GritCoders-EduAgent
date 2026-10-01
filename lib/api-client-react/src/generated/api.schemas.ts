@@ -122,8 +122,28 @@ export interface PracticeCompletionInput {
 export interface PracticeResult {
   correct: boolean;
   scorePercent: number;
+  scored?: boolean;
   feedback: string;
   nextStep: string;
+  adaptation?: string;
+}
+
+export interface LearningAnalyticsTopic {
+  topicId: string;
+  topic: string;
+  attempts: number;
+  averageScore: number;
+  recentAverage: number;
+  change: number | null;
+}
+
+export interface LearningAnalytics {
+  scoredAttempts: number;
+  averageScore: number | null;
+  scoreChange: number | null;
+  trend: 'building_baseline' | 'improving' | 'steady' | 'needs_attention';
+  topics: LearningAnalyticsTopic[];
+  method: string;
 }
 
 export interface Peer {

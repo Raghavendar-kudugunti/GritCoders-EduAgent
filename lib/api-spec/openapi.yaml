@@ -38,6 +38,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /analytics:
+    get:
+      operationId: getLearningAnalytics
+      tags: [learning]
+      summary: Get learner-specific scored practice analytics
+      responses:
+        "200":
+          description: Descriptive score and topic progress signals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningAnalytics"
   /profile:
     get:
       operationId: getLearnerProfile
@@ -619,8 +631,31 @@ components:
       properties:
         correct: { type: boolean }
         scorePercent: { type: integer }
+        scored: { type: boolean, description: False when provider grading was unavailable; exclude from score analytics }
         feedback: { type: string }
         nextStep: { type: string }
+        adaptation: { type: string }
+    LearningAnalytics:
+      type: object
+      required: [scoredAttempts, averageScore, scoreChange, trend, topics, method]
+      properties:
+        scoredAttempts: { type: integer }
+        averageScore: { type: [integer, "null"] }
+        scoreChange: { type: [integer, "null"], description: Difference between first and second halves after four attempts }
+        trend: { type: string, enum: [building_baseline, improving, steady, needs_attention] }
+        topics:
+          type: array
+          items:
+            type: object
+            required: [topicId, topic, attempts, averageScore, recentAverage, change]
+            properties:
+              topicId: { type: string }
+              topic: { type: string }
+              attempts: { type: integer }
+              averageScore: { type: integer }
+              recentAverage: { type: integer }
+              change: { type: [integer, "null"] }
+        method: { type: string }
     Peer:
       type: object
       required: [id, name, role, focus, level, matchPercent, initials, accent]

@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from html.parser import HTMLParser
 from typing import Annotated
@@ -29,10 +29,7 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user_id)])
 
-activity = [
-    {"day": day, "minutes": minutes, "isToday": day == "Sun"}
-    for day, minutes in [("Mon", 32), ("Tue", 18), ("Wed", 46), ("Thu", 27), ("Fri", 54), ("Sat", 12), ("Sun", 38)]
-]
+activity = []
 seed_dashboard = {
     "learnerName": "Learner", "greeting": "Welcome back", "currentTopic": "",
     "currentTopicLabel": "Your first lesson", "progressPercent": 0,
@@ -158,7 +155,52 @@ class _HTMLText(HTMLParser):
 
 @router.get("/dashboard")
 def dashboard(user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
-    return learner(db, user_id).dashboard
+    record = learner(db, user_id)
+    now = datetime.now(timezone.utc)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=6)
+    attempts = db.query(PracticeRecord).filter(PracticeRecord.user_id == user_id, PracticeRecord.created_at >= start).all()
+    by_day = {}
+    for attempt in attempts:
+        day = attempt.created_at.astimezone(timezone.utc).date()
+        by_day[day] = by_day.get(day, 0) + (5 if attempt.scored else 0)
+    days = [now.date() - timedelta(days=offset) for offset in range(6, -1, -1)]
+    result = dict(record.dashboard)
+    result["weeklyActivity"] = [{"day": day.strftime("%a"), "minutes": by_day.get(day, 0), "isToday": day == now.date()} for day in days]
+    result["weeklyMinutes"] = sum(by_day.values())
+    scored_days = {row.created_at.astimezone(timezone.utc).date() for row in db.query(PracticeRecord).filter(PracticeRecord.user_id == user_id, PracticeRecord.scored.is_(True)).all()}
+    streak = 0
+    current_day = now.date()
+    if current_day not in scored_days:
+        current_day -= timedelta(days=1)
+    while current_day in scored_days:
+        streak += 1
+        current_day -= timedelta(days=1)
+    result["streakDays"] = streak
+    return result
+
+
+@router.get("/analytics")
+def learning_analytics(user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    attempts = db.query(PracticeRecord).filter(PracticeRecord.user_id == user_id, PracticeRecord.scored.is_(True)).order_by(PracticeRecord.created_at.asc(), PracticeRecord.id.asc()).all()
+    by_topic: dict[str, list[PracticeRecord]] = {}
+    for attempt in attempts:
+        topic_id = attempt.prompt_id.split(":", 1)[0].removesuffix("-practice")
+        by_topic.setdefault(topic_id, []).append(attempt)
+    topic_names = {item.get("id"): item.get("title") for item in learner(db, user_id).learning_path}
+    topics = []
+    for topic_id, rows in by_topic.items():
+        scores = [row.score_percent for row in rows]
+        split = len(scores) // 2
+        early = sum(scores[:split]) / split if split else 0
+        recent = sum(scores[split:]) / (len(scores) - split) if split < len(scores) else 0
+        topics.append({"topicId": topic_id, "topic": topic_names.get(topic_id, topic_id.replace("-", " ").title()), "attempts": len(scores), "averageScore": round(sum(scores) / len(scores)), "recentAverage": round(recent), "change": round(recent - early) if len(scores) >= 4 else None})
+    topics.sort(key=lambda item: item["attempts"], reverse=True)
+    scores = [item.score_percent for item in attempts]
+    split = len(scores) // 2
+    early_average = sum(scores[:split]) / split if split else 0
+    recent_average = sum(scores[split:]) / (len(scores) - split) if split < len(scores) else 0
+    delta = round(recent_average - early_average) if len(scores) >= 4 else None
+    return {"scoredAttempts": len(attempts), "averageScore": round(sum(scores) / len(scores)) if scores else None, "scoreChange": delta, "trend": "building_baseline" if delta is None else "improving" if delta >= 8 else "needs_attention" if delta <= -8 else "steady", "topics": topics, "method": "Only attempts graded successfully by the tutor are included. Score change compares the first and second halves of the attempt history, and appears after at least four scored attempts; it is descriptive, not a causal learning-gain estimate."}
 
 
 @router.get("/profile")
@@ -210,10 +252,12 @@ def daily_practice(user_id: Annotated[str, Depends(current_user_id)], db: Sessio
         return enrich_practice(practice_prompt, {"title": practice_prompt["topic"]})
     prompt = current.get("practicePrompt")
     if prompt is None:
+        performance = record.profile.get("topicPerformance", {}).get(current["id"], {})
         prompt = complete("practice_prompt", {
             "concept": {"title": current["title"], "description": current["description"]},
             "level": record.profile.get("level", "beginner"),
             "focus": record.profile.get("focus", "fundamentals"),
+            "performance": performance,
         })
     enriched_prompt = enrich_practice(prompt, current)
     if enriched_prompt != prompt:
@@ -293,6 +337,9 @@ def get_lesson(concept_id: str, user_id: Annotated[str, Depends(current_user_id)
     if node is None:
         raise HTTPException(status_code=404, detail="Lesson not found in this learner's path")
     lesson = node.get("lessonContent") if in_path else record.profile.get("exploredLessons", {}).get(concept_id)
+    performance = record.profile.get("topicPerformance", {}).get(concept_id, {})
+    if in_path and node.get("lessonPerformanceCount") != performance.get("attempts", 0):
+        lesson = None
     if lesson is None:
         lesson = generate_lesson({
             "concept": {key: node.get(key) for key in ("id", "title", "category", "trackId", "description")},
@@ -302,10 +349,12 @@ def get_lesson(concept_id: str, user_id: Annotated[str, Depends(current_user_id)
                 "focus": record.profile.get("focus", "fundamentals"),
                 "strengths": record.profile.get("strengths", []),
                 "focusAreas": record.profile.get("focusAreas", []),
+                "topicPerformance": performance,
             },
         })
         if in_path:
             node["lessonContent"] = lesson
+            node["lessonPerformanceCount"] = performance.get("attempts", 0)
             record.learning_path = path
         else:
             record.profile = {
@@ -408,12 +457,28 @@ def complete_practice(body: PracticeCompletion, user_id: Annotated[str, Depends(
         "answer": body.answer,
         "level": data.profile.get("level", "beginner"),
         "focus": data.profile.get("focus", "fundamentals"),
+        "performance": data.profile.get("topicPerformance", {}).get(matching_node["id"], {}) if matching_node else {},
     })
     # Practice contributes study time and feedback, while path progress changes
     # only when the learner completes a lesson.
-    data.dashboard = {**data.dashboard, "weeklyMinutes": data.dashboard["weeklyMinutes"] + 5, "streakDays": data.dashboard["streakDays"] + 1}
+    data.dashboard = {**data.dashboard}
     saved_prompt_id = f"{body.promptId}:{body.activityId}" if body.activityId else body.promptId
-    db.add(PracticeRecord(user_id=user_id, prompt_id=saved_prompt_id, answer=body.answer, correct=bool(result["correct"]), score_percent=int(result["scorePercent"]), feedback=result["feedback"], next_step=result["nextStep"]))
+    scored = bool(result.get("scored", False))
+    db.add(PracticeRecord(user_id=user_id, prompt_id=saved_prompt_id, answer=body.answer, correct=bool(result["correct"]), score_percent=int(result["scorePercent"]), feedback=result["feedback"], next_step=result["nextStep"], scored=scored))
+    if matching_node and scored:
+        profile = dict(data.profile)
+        signals = dict(profile.get("topicPerformance", {}))
+        previous = dict(signals.get(matching_node["id"], {}))
+        recent = [int(value) for value in previous.get("recentScores", []) if isinstance(value, (int, float))][-2:] + [int(result["scorePercent"])]
+        count = int(previous.get("attempts", 0)) + 1
+        average = round((float(previous.get("averageScore", 0)) * (count - 1) + int(result["scorePercent"])) / count)
+        signals[matching_node["id"]] = {"attempts": count, "averageScore": average, "recentScores": recent, "latestScore": int(result["scorePercent"]), "guidance": "Add another worked example and a prerequisite check" if sum(recent) / len(recent) < 50 else "Use a more applied challenge and ask for a transfer example" if len(recent) >= 2 and all(value >= 80 for value in recent) else "Keep the explanation and practice at the current level"}
+        profile["topicPerformance"] = signals
+        data.profile = profile
+        # Generate the next practice using the newly observed performance.
+        matching_node["practicePrompt"] = None
+        data.learning_path = deepcopy(data.learning_path)
+        result["adaptation"] = signals[matching_node["id"]]["guidance"]
     db.commit()
     return result
 

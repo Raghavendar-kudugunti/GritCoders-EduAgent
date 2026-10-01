@@ -1,0 +1,9 @@
+{
+  "mode": "live",
+  "status": "provider_unavailable",
+  "count": 0,
+  "personasAvailable": 12,
+  "providerError": "APIConnectionError",
+  "trace": "Provider preflight failed; no persona predictions were attempted.",
+  "records": []
+}

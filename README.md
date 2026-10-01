@@ -51,12 +51,18 @@ Set these values in `.env`:
 | `LLM_API_KEY` | API key for the configured model provider |
 | `LLM_BASE_URL` | OpenAI-compatible API base URL; the example uses Groq |
 | `LLM_MODEL` | Model name supported by that provider |
+| `LLM_FALLBACK_API_KEY` | Optional backup provider key; leave blank to disable failover |
+| `LLM_FALLBACK_BASE_URL` | Backup OpenAI-compatible endpoint (defaults to Gemini) |
+| `LLM_FALLBACK_MODEL` | Required model name when a backup key is configured |
+| `LLM_TIMEOUT_SECONDS` | Per-provider request timeout; defaults to 30 seconds |
 | `CLERK_PUBLISHABLE_KEY` | Clerk publishable key used by the backend to locate signing keys |
 | `CLERK_SECRET_KEY` | Clerk secret key, required for the Clerk proxy endpoint |
 | `VITE_CLERK_PUBLISHABLE_KEY` | The same publishable key, exposed to the frontend build |
 | `VITE_CLERK_PROXY_URL` | Leave blank for standard Clerk development setup; use `/api/__clerk` only when your Clerk setup is configured to use this app's proxy |
 
 Keep `.env` private. Do not commit it or paste its contents into issues or chat. `.env.example` contains placeholders and is safe to commit.
+
+To enable Gemini failover, set `LLM_FALLBACK_API_KEY` and `LLM_FALLBACK_MODEL` in your local `.env`; keep the fallback base URL at its default unless you choose another compatible provider. The OpenAI-compatible Gemini endpoint is supported by the current client, but provider/model availability and quotas depend on your account. Restart the backend after changing these values.
 
 Create a PostgreSQL database before starting the backend. For example, in `psql`:
 
@@ -109,6 +115,14 @@ pnpm run build
 ```
 
 The API contract is maintained in `lib/api-spec/openapi.yaml`. The generated client command is available in the `@workspace/api-spec` package; it requires the workspace dependencies to be installed.
+
+## Adaptive learning and evaluation
+
+The LangGraph onboarding flow estimates a starting level and builds a role/focus-specific path. Successfully graded practice is saved with a scoring flag and topic-level performance signal. Later lesson and practice generation uses those signals to add scaffolding after low scores or offer deeper application after repeated strong scores. If the grader/provider is unavailable, the attempt is marked unscored and excluded from score analytics. Lesson completion remains learner-controlled. An optional second OpenAI-compatible provider can be configured for LLM failover; the default backup endpoint is Gemini, and it remains disabled until a fallback key and model are configured.
+
+Data engineering and machine learning lessons include an optional project using a public UDISE+ school-count dataset from data.gov.in. It uses the downloadable dataset page rather than requiring a data.gov.in API key. The exercise focuses on inspecting and visualizing aggregates and calls out limits: the data is not student-level and school counts are not learning outcomes.
+
+The learner dashboard shows scored-attempt averages and descriptive early/recent score changes. Practice time is estimated at five minutes per successfully scored attempt. These values are progress signals, not causal learning-gain claims. Run the synthetic 12-persona fallback evaluation with `python scripts/evaluate_personas.py --mode fallback`; see [`eval/README.md`](eval/README.md) and [`eval/RESULTS.md`](eval/RESULTS.md) for the data, current numbers, traces, and limits. The personas are project-authored and are not official hackathon-provided cases.
 
 ## Project layout
 

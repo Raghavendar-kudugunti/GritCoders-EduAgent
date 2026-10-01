@@ -1,0 +1,170 @@
+[
+  {
+    "id": "persona_01",
+    "label": "First-time learner",
+    "role": "student",
+    "focus": "fundamentals",
+    "expectedLevel": "beginner",
+    "answers": [
+      "miss:q1",
+      "miss:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "No AI or coding experience",
+    "claimedLevel": "beginner"
+  },
+  {
+    "id": "persona_02",
+    "label": "AI-curious teacher",
+    "role": "teacher",
+    "focus": "fundamentals",
+    "expectedLevel": "developing",
+    "answers": [
+      "correct:q1",
+      "miss:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Can explain basic AI examples, no technical practice",
+    "claimedLevel": "beginner"
+  },
+  {
+    "id": "persona_03",
+    "label": "Startup founder",
+    "role": "entrepreneur",
+    "focus": "generativeAI",
+    "expectedLevel": "developing",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Uses AI tools, little model-building experience",
+    "claimedLevel": "developing"
+  },
+  {
+    "id": "persona_04",
+    "label": "Python developer new to ML",
+    "role": "engineer",
+    "focus": "machineLearning",
+    "expectedLevel": "developing",
+    "answers": [
+      "correct:q1",
+      "miss:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Writes Python, new to ML concepts",
+    "claimedLevel": "intermediate"
+  },
+  {
+    "id": "persona_05",
+    "label": "Math-first learner",
+    "role": "student",
+    "focus": "math",
+    "expectedLevel": "developing",
+    "answers": [
+      "correct:q1",
+      "miss:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Comfortable with algebra and probability, limited code",
+    "claimedLevel": "developing"
+  },
+  {
+    "id": "persona_06",
+    "label": "CS student with ML basics",
+    "role": "student",
+    "focus": "deepLearning",
+    "expectedLevel": "intermediate",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Has trained simple supervised models",
+    "claimedLevel": "intermediate"
+  },
+  {
+    "id": "persona_07",
+    "label": "Traditional ML practitioner",
+    "role": "engineer",
+    "focus": "generativeAI",
+    "expectedLevel": "intermediate",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Knows evaluation and classic ML, new to LLMs",
+    "claimedLevel": "intermediate"
+  },
+  {
+    "id": "persona_08",
+    "label": "Transformer-focused learner",
+    "role": "student",
+    "focus": "nlp",
+    "expectedLevel": "intermediate",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "correct:q3"
+    ],
+    "priorKnowledge": "Understands tokenization and attention, limited deployment",
+    "claimedLevel": "intermediate"
+  },
+  {
+    "id": "persona_09",
+    "label": "RAG builder",
+    "role": "engineer",
+    "focus": "rag",
+    "expectedLevel": "advanced",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "correct:q3"
+    ],
+    "priorKnowledge": "Has built retrieval pipelines and evaluates retrieval quality",
+    "claimedLevel": "advanced"
+  },
+  {
+    "id": "persona_10",
+    "label": "Data engineer entering AI",
+    "role": "engineer",
+    "focus": "dataEngineering",
+    "expectedLevel": "intermediate",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Builds production pipelines, new to model behavior",
+    "claimedLevel": "developing"
+  },
+  {
+    "id": "persona_11",
+    "label": "MLOps engineer",
+    "role": "engineer",
+    "focus": "mlops",
+    "expectedLevel": "advanced",
+    "answers": [
+      "correct:q1",
+      "correct:q2",
+      "correct:q3"
+    ],
+    "priorKnowledge": "Operates model deployments and monitoring",
+    "claimedLevel": "advanced"
+  },
+  {
+    "id": "persona_12",
+    "label": "Overconfident beginner",
+    "role": "curious",
+    "focus": "machineLearning",
+    "expectedLevel": "beginner",
+    "answers": [
+      "miss:q1",
+      "miss:q2",
+      "miss:q3"
+    ],
+    "priorKnowledge": "Self-rates as advanced but misses foundational diagnostic items",
+    "claimedLevel": "advanced"
+  }
+]

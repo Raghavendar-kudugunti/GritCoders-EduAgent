@@ -161,6 +161,37 @@ pnpm run build
 
 The API contract is maintained in `lib/api-spec/openapi.yaml`. The generated client command is available in the `@workspace/api-spec` package; it requires the workspace dependencies to be installed.
 
+## Deploy without Replit
+
+The deployment files in this repository target **Vercel** for the React frontend, **Render** for the FastAPI/LangGraph backend, and **Neon** for hosted PostgreSQL. The browser keeps calling `/api/...`; Vercel forwards those requests to Render. Your local PostgreSQL database and local `.env` are not used by the deployed app.
+
+### 1. Create the hosted database
+
+Create a PostgreSQL project in Neon, then copy its connection string from the Neon dashboard. Use the pooled connection string if Neon offers one, and keep the password private. You will add it as `DATABASE_URL` in Render.
+
+### 2. Deploy the API on Render
+
+1. Push this repository to GitHub, then create a Render **Blueprint** from that repository. Render detects the root `render.yaml` and proposes the `gritcoders-eduagent-api` web service.
+2. When Render requests secret values, enter:
+   - `DATABASE_URL`: the Neon connection string.
+   - `LLM_API_KEY`: an active key for the provider configured by `LLM_BASE_URL` and `LLM_MODEL` (the defaults in `render.yaml` use Groq).
+   - `CLERK_PUBLISHABLE_KEY`: the publishable key from the Clerk instance you plan to use on the deployed site.
+3. Deploy the service and wait for `/health` to report healthy. The API URL should be `https://gritcoders-eduagent-api.onrender.com`; if Render requires a different service name, update the API destination in `vercel.json` to match.
+
+### 3. Deploy the frontend on Vercel
+
+1. Import the same GitHub repository into Vercel. Keep the project root directory as `.` so workspace dependencies and `vercel.json` are found.
+2. Add `VITE_CLERK_PUBLISHABLE_KEY` with the same Clerk publishable key used by the API. Leave `VITE_CLERK_PROXY_URL` unset or blank to use Clerk's standard hosted frontend API.
+3. Deploy. The checked-in `vercel.json` sets the Vite build command and output folder, routes `/api/*` to Render, and sends frontend routes to the SPA entry point.
+
+### 4. Finish Clerk setup
+
+Use a Clerk instance configured for the deployed site's domain, and add the Vercel production domain to its allowed origins/redirect settings. Keep secret keys in provider dashboards only; do not commit them or put them in `VITE_*` variables. The current standard Clerk setup does not need `CLERK_SECRET_KEY` on Render. Configure `CLERK_SECRET_KEY` only if you intentionally enable the app's Clerk proxy.
+
+### Demo hosting notes
+
+Render's free web service may sleep when idle, so its first request after a quiet period can take a while. Neon and Render have separate quotas and plan limits; check their current dashboards before relying on this setup for sustained traffic. This setup is intended to make the hackathon project publicly reachable, not to promise production availability.
+
 ## Adaptive learning and evaluation
 
 The LangGraph onboarding flow estimates a starting level and builds a role/focus-specific path. Successfully graded practice is saved with a scoring flag and topic-level performance signal. Later lesson and practice generation uses those signals to add scaffolding after low scores or offer deeper application after repeated strong scores. If the grader/provider is unavailable, the attempt is marked unscored and excluded from score analytics. Lesson completion remains learner-controlled. An optional second OpenAI-compatible provider can be configured for LLM failover; the default backup endpoint is Gemini, and it remains disabled until a fallback key and model are configured.

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --filter @workspace/eduagent run build",
+  "outputDirectory": "artifacts/eduagent/dist/public",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://gritcoders-eduagent-api.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

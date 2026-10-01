@@ -2,7 +2,7 @@ import os
 from collections.abc import Generator
 
 from fastapi import HTTPException
-from sqlalchemy import BigInteger, DateTime, Integer, String, Text, create_engine, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -77,6 +77,35 @@ class TutorDocumentRecord(Base):
     user_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PeerConversationRecord(Base):
+    __tablename__ = "peer_conversations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_group: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PeerConversationMemberRecord(Base):
+    __tablename__ = "peer_conversation_members"
+
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("peer_conversations.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(255), primary_key=True, index=True)
+    joined_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PeerMessageRecord(Base):
+    __tablename__ = "peer_messages"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("peer_conversations.id", ondelete="CASCADE"), index=True, nullable=False)
+    sender_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

@@ -1,3 +1,17 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <g id="mark">
+    <rect x="8" y="8" width="112" height="112" rx="39" fill="#C6DD59"/>
+    <path d="M81 9c-8 10-9 22-4 32 5 10 18 14 43 8" fill="none" stroke="#9BB64E" stroke-width="7"/>
+    <g fill="none" stroke="#233039" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
+      <path d="M62 41c-4-8-14-10-22-5-8 5-10 15-6 23-8 4-11 15-6 23-2 10 5 19 16 19h18"/>
+      <path d="M63 34v67"/>
+      <path d="M63 47h18m-18 14h18m-18 15h14m-14 15h14"/>
+      <path d="M81 47h8m-8 14h8m-12 15h12m-12 15h12"/>
+      <path d="M43 45c-5 4-6 11-3 16m-1 22c5-1 9-5 10-10m-1-20c5 2 8 6 9 11m-10 7c4-1 7-4 8-8"/>
+    </g>
+    <circle cx="91" cy="47" r="4" fill="#233039"/>
+    <circle cx="91" cy="61" r="4" fill="#233039"/>
+    <circle cx="91" cy="76" r="4" fill="#233039"/>
+    <circle cx="91" cy="91" r="4" fill="#233039"/>
+  </g>
 </svg>

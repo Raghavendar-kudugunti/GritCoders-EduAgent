@@ -70,6 +70,16 @@ export interface PracticePrompt {
   options: string[];
   minutes: number;
   difficulty: string;
+  activities?: PracticeActivity[];
+}
+
+export interface PracticeActivity {
+  id: string;
+  type: 'explain' | 'scenario' | 'order';
+  title: string;
+  prompt: string;
+  options?: string[];
+  steps?: string[];
 }
 
 export interface DiagnosticInput {
@@ -106,6 +116,7 @@ export interface OnboardingResult {
 export interface PracticeCompletionInput {
   promptId: string;
   answer: string;
+  activityId?: string;
 }
 
 export interface PracticeResult {

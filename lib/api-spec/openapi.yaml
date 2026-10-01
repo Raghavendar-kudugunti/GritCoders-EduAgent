@@ -219,16 +219,63 @@ paths:
     get:
       operationId: getPeers
       tags: [learning]
-      summary: Find learners studying related AI topics
+      summary: Find signed-up learners studying related AI topics
       responses:
         "200":
-          description: Suggested peer matches
+          description: Database-backed peer matches
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/Peer"
+  /peers/conversations:
+    get:
+      operationId: listPeerConversations
+      tags: [learning]
+      summary: List the signed-in learner's peer conversations
+      responses:
+        "200":
+          description: Peer conversations
+    post:
+      operationId: createPeerConversation
+      tags: [learning]
+      summary: Start a direct or group peer conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PeerConversationCreateInput"
+      responses:
+        "200":
+          description: Conversation created or existing direct conversation returned
+  /peers/conversations/{conversation_id}/messages:
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getPeerMessages
+      tags: [learning]
+      summary: Read messages for a conversation the learner belongs to
+      responses:
+        "200":
+          description: Messages in the conversation
+    post:
+      operationId: sendPeerMessage
+      tags: [learning]
+      summary: Send a message to a peer conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PeerMessageInput"
+      responses:
+        "200":
+          description: Saved peer message
   /tutor/message:
     post:
       operationId: sendTutorMessage
@@ -247,6 +294,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TutorMessage"
+  /tutor/context:
+    put:
+      operationId: saveTutorContext
+      tags: [learning]
+      summary: Save the learner's active tutor topic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TutorTopicContextInput" }
+      responses:
+        "200":
+          description: Saved tutor topic context
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [topic]
+                properties:
+                  topic: { type: string }
   /tutor/documents:
     get:
       operationId: listTutorDocuments
@@ -336,6 +403,7 @@ components:
             ageGroup: { type: string }
             role: { type: string }
             focus: { type: string }
+            tutorTopic: { type: string }
     ActivityDay:
       type: object
       required: [day, minutes]
@@ -406,6 +474,39 @@ components:
         workedExample: { type: string }
         practiceQuestion: { type: string }
         checkAnswer: { type: string }
+        visualSteps:
+          type: array
+          items: { type: string }
+        codeExample:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [language, code, explanation, tryIt]
+              properties:
+                language: { type: string }
+                code: { type: string }
+                explanation: { type: string }
+                tryIt: { type: string }
+        miniProject:
+          type: object
+          required: [title, brief, steps, stretchGoal]
+          properties:
+            title: { type: string }
+            brief: { type: string }
+            steps:
+              type: array
+              items: { type: string }
+            stretchGoal: { type: string }
+        recommendedResources:
+          type: array
+          items:
+            type: object
+            required: [title, url, kind, description]
+            properties:
+              title: { type: string }
+              url: { type: string, format: uri }
+              kind: { type: string }
+              description: { type: string }
     LearningPathCompletion:
       type: object
       required: [learningPath, dashboard]
@@ -448,6 +549,22 @@ components:
           items: { type: string }
         minutes: { type: integer }
         difficulty: { type: string }
+        activities:
+          type: array
+          items:
+            type: object
+            required: [id, type, title, prompt]
+            properties:
+              id: { type: string }
+              type: { type: string, enum: [explain, scenario, order] }
+              title: { type: string }
+              prompt: { type: string }
+              options:
+                type: array
+                items: { type: string }
+              steps:
+                type: array
+                items: { type: string }
     DiagnosticInput:
       type: object
       required: [topic, answer, claimedLevel]
@@ -495,6 +612,7 @@ components:
       properties:
         promptId: { type: string }
         answer: { type: string }
+        activityId: { type: string }
     PracticeResult:
       type: object
       required: [correct, scorePercent, feedback, nextStep]
@@ -515,12 +633,32 @@ components:
         matchPercent: { type: integer }
         initials: { type: string }
         accent: { type: string }
+    PeerConversationCreateInput:
+      type: object
+      required: [memberIds]
+      properties:
+        memberIds:
+          type: array
+          minItems: 1
+          maxItems: 19
+          items: { type: string }
+        name: { type: string, maxLength: 120 }
+    PeerMessageInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 4000 }
     TutorMessageInput:
       type: object
       required: [message]
       properties:
         message: { type: string }
         topic: { type: ["string", "null"] }
+    TutorTopicContextInput:
+      type: object
+      required: [topic]
+      properties:
+        topic: { type: string, minLength: 1, maxLength: 160 }
     TutorMessage:
       type: object
       required: [reply, topic, suggestedPrompt]

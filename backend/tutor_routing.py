@@ -119,7 +119,9 @@ def _synthesize(state: TutorState) -> TutorState:
             "citations": [],
         }}
     prompt = (
-        "You are EduAgent, an adaptive AI tutor. Answer the student's question clearly at their level. "
+        "You are EduAgent, an adaptive AI tutor. Treat the supplied topic as the learner's active subject and "
+        "anchor the answer, examples, terminology, and next step to that topic. If the question is broad, interpret "
+        "it within the supplied topic; do not drift to unrelated AI subjects. Answer clearly at the learner's level. "
         "Use only the supplied retrieved context for claims attributed to it; explain when the context is incomplete. "
         "For GraphRAG context, connect prerequisite and related concepts and give a useful learning sequence. "
         "For document passages, stay faithful to the excerpts and do not invent quotations. Return JSON with reply "

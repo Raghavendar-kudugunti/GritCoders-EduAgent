@@ -16,6 +16,7 @@ from backend.curriculum import (
     get_concept,
     get_track_concepts,
 )
+from backend.lesson_extras import enrich_lesson
 
 
 def _fallback_questions(profile: dict[str, Any]) -> dict[str, Any]:
@@ -256,21 +257,29 @@ def _coach(state: LearningTask) -> LearningTask:
         "lesson": (
             "You are a clear, adaptive AI tutor. Teach the requested curriculum concept at the learner's level. "
             "Use the provided concept description as the lesson scope. Explain the concept accurately in plain "
-            "language in plain text with no markdown, then add a concrete example and a short retrieval-practice question. Return JSON with "
-            "objective, explanation (plain text string), keyIdeas (3-5 strings), workedExample, practiceQuestion, "
-            "and checkAnswer. Avoid filler and do not assume prior knowledge beyond the provided level."
+            "language in plain text, then add a concrete example and a short retrieval-practice question. Return JSON with "
+            "objective, explanation, keyIdeas (3-5 strings), workedExample, practiceQuestion, checkAnswer, "
+            "visualSteps (3-5 short, specific stages suitable for a visual flow diagram), codeExample "
+            "(null when code would not teach this concept, otherwise {language, code, explanation, tryIt}; code must be plain source without markdown fences), "
+            "and miniProject ({title, brief, steps (3-5 strings), stretchGoal}). Do not return resource URLs; "
+            "the app adds vetted resources. Keep the example and project specific to the concept and learner level. "
+            "Avoid filler and do not assume prior knowledge beyond the provided level."
         ),
         "practice_prompt": (
-            "Create one short, concept-specific multiple-choice check for this learner. Match the learner's level. "
-            "Return JSON with title, prompt, options (exactly four concise strings), minutes (integer), and difficulty. "
-            "The question must test understanding of the supplied concept, not unrelated embeddings or generic AI facts."
+            "Create an interactive practice set for this specific concept and learner level. Return JSON with title, "
+            "prompt, options (exactly four concise strings for the main multiple-choice question), minutes (integer), "
+            "difficulty, and activities: an array with exactly three activities, one each of type explain, scenario, "
+            "and order. Every activity has id, type, title, and prompt. Scenario also has exactly three options. "
+            "Order has 3-5 short steps in the correct order. Keep all activities concept-specific, useful, and clear. "
+            "Do not include answers or solutions in the returned JSON."
         ),
         "diagnostic": (
             "Assess the learner's stated experience and answer for the requested topic. Return JSON with evaluatedLevel, "
             "accuracyPercent (integer 0-100), strengths (string array), focusAreas (string array), and a supportive message."
         ),
         "practice": (
-            "Grade the learner's response to the practice prompt leniently for conceptual understanding. "
+            "Grade the learner's response to the supplied practice prompt and activity leniently for conceptual understanding. "
+            "For ordering activities, judge whether the sequence is sensible; for scenarios, consider both the choice and its reason. "
             "Return JSON with correct (boolean), scorePercent (integer 0-100), feedback, and nextStep."
         ),
         "tutor": (
@@ -292,7 +301,8 @@ def _coach(state: LearningTask) -> LearningTask:
             output = {"objective": f"Understand {title} and when it is useful.", "explanation": description, "keyIdeas": [description, "Connect the idea to a concrete problem", "Check results with evidence"], "workedExample": f"Suppose you are working on a small project involving {title.lower()}. First define the outcome you need, then apply this idea and inspect whether the result supports that outcome.", "practiceQuestion": f"In your own words, where could {title.lower()} help solve a problem?", "checkAnswer": f"A strong answer connects {title.lower()} to the problem it addresses and explains how you would check the result."}
         elif action == "practice_prompt":
             concept = data.get("concept", {})
-            output = {"title": f"Check your understanding: {concept.get('title', 'this concept')}", "prompt": f"Which is the best first step when applying {concept.get('title', 'this concept')}?", "options": ["Define the problem and inspect evidence", "Use the most complex tool immediately", "Assume the first result is correct", "Skip evaluation"], "minutes": 5, "difficulty": data.get("level", "beginner")}
+            title = concept.get("title", "this concept")
+            output = {"title": f"Check your understanding: {title}", "prompt": f"Which statement best describes {title}?", "options": ["Use the concept to solve a specific problem and check the result", "Choose the most complex tool before defining the problem", "Assume the first output is always correct", "Skip evaluation and explanation"], "minutes": 8, "difficulty": data.get("level", "beginner")}
         elif action == "practice":
             output = {"correct": True, "scorePercent": 70, "feedback": "Your response was recorded. Compare it with the prompt and explain the key idea in your own words.", "nextStep": "Review the lesson and try another example."}
         elif action == "diagnostic":
@@ -331,4 +341,26 @@ def generate_onboarding_questions(profile: dict[str, Any]) -> dict[str, Any]:
 
 
 def generate_lesson(data: dict[str, Any]) -> dict[str, Any]:
-    return complete("lesson", data)
+    lesson = complete("lesson", data)
+    return enrich_lesson(data.get("concept", {}), lesson)
+
+
+def enrich_practice(data: dict[str, Any], concept: dict[str, Any]) -> dict[str, Any]:
+    """Add usable activity formats to older or incomplete cached practice prompts."""
+    result = dict(data)
+    title = concept.get("title", result.get("topic", "this concept"))
+    activities = result.get("activities")
+    required_types = {"explain", "scenario", "order"}
+    valid = isinstance(activities, list) and all(
+        isinstance(item, dict) and item.get("id") and item.get("title") and item.get("prompt")
+        and (item.get("type") != "scenario" or isinstance(item.get("options"), list) and len(item["options"]) >= 2)
+        and (item.get("type") != "order" or isinstance(item.get("steps"), list) and len(item["steps"]) >= 3)
+        for item in activities
+    ) and required_types.issubset({item.get("type") for item in activities})
+    if not valid:
+        result["activities"] = [
+            {"id": "explain", "type": "explain", "title": "Teach it back", "prompt": f"Explain {title} in your own words. Include one example and how you would check that it worked."},
+            {"id": "scenario", "type": "scenario", "title": "Choose a move", "prompt": f"You need to use {title} in a small project. What is the most useful next move?", "options": ["Define the goal, apply the idea, then inspect the result", "Pick the largest tool before understanding the task", "Trust the first result without checking it"]},
+            {"id": "order", "type": "order", "title": "Build the workflow", "prompt": f"Put these steps for applying {title} in a sensible order.", "steps": ["Define the question and success check", "Prepare the inputs or evidence", f"Apply {title} to the problem", "Inspect the result and revise if needed"]},
+        ]
+    return result

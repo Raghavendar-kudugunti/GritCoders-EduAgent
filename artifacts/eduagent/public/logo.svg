@@ -1,7 +1,18 @@
-<svg width="180" height="48" viewBox="0 0 180 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="48" height="48" rx="14" fill="#D8E58B"/>
-  <circle cx="38" cy="10" r="9" stroke="#2D716B" stroke-width="2.5"/>
-  <path d="M15.5 24.5C15.5 19.8056 19.3056 16 24 16C28.6944 16 32.5 19.8056 32.5 24.5C32.5 29.1944 28.6944 33 24 33C19.3056 33 15.5 29.1944 15.5 24.5Z" stroke="#233039" stroke-width="2.5"/>
-  <path d="M20 24.5H28M24 20.5V28.5M15.8 20.6L12.7 18.8M32.2 20.6L35.3 18.8M15.8 28.4L12.7 30.2M32.2 28.4L35.3 30.2" stroke="#233039" stroke-width="2.2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="48" viewBox="0 0 180 48">
+  <g transform="scale(.375)">
+    <rect x="8" y="8" width="112" height="112" rx="39" fill="#C6DD59"/>
+    <path d="M81 9c-8 10-9 22-4 32 5 10 18 14 43 8" fill="none" stroke="#9BB64E" stroke-width="7"/>
+    <g fill="none" stroke="#233039" stroke-linecap="round" stroke-linejoin="round" stroke-width="7">
+      <path d="M62 41c-4-8-14-10-22-5-8 5-10 15-6 23-8 4-11 15-6 23-2 10 5 19 16 19h18"/>
+      <path d="M63 34v67"/>
+      <path d="M63 47h18m-18 14h18m-18 15h14m-14 15h14"/>
+      <path d="M81 47h8m-8 14h8m-12 15h12m-12 15h12"/>
+      <path d="M43 45c-5 4-6 11-3 16m-1 22c5-1 9-5 10-10m-1-20c5 2 8 6 9 11m-10 7c4-1 7-4 8-8"/>
+    </g>
+    <circle cx="91" cy="47" r="4" fill="#233039"/>
+    <circle cx="91" cy="61" r="4" fill="#233039"/>
+    <circle cx="91" cy="76" r="4" fill="#233039"/>
+    <circle cx="91" cy="91" r="4" fill="#233039"/>
+  </g>
   <text x="60" y="31" fill="#233039" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="-1">EduAgent</text>
 </svg>

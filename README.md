@@ -7,8 +7,11 @@ EduAgent is an adaptive AI learning app. Learners choose a focus, complete a sho
 - React learning app with sign-in, onboarding, dashboard, adaptive path, practice, topic map, and tutor.
 - FastAPI backend organized around LangGraph workflows.
 - PostgreSQL persistence for learner profiles, paths, lesson completion, practice, tutor messages, and private tutor documents. Tables are created automatically when the backend starts.
+- Peer matching uses signed-in learners' saved interests and learning progress. Direct and group conversations are stored in PostgreSQL and refresh while the chat is open.
 - Personalized curriculum covering AI foundations, Python, machine learning, deep learning, generative AI, RAG, data engineering, and MLOps.
+- Lesson pages combine a visual concept flow, short explanation, code example where relevant, a mini project, and topic-matched video/course links.
 - Tutor routing: conceptual/comparison/path questions use graph-style retrieval over the curriculum; fact checks and document lookups use keyword-based retrieval over the learner's uploaded files.
+- The learner's selected tutor topic is saved to their profile and reused as answer and retrieval context.
 - Uploads support TXT, Markdown, CSV, and HTML files up to 5 MB each. Documents are private to the signed-in account.
 
 The tutor does not have live web search. Its GraphRAG-style route uses the app's connected curriculum catalog, and its document route searches uploaded files. It does not use a separate graph database or embedding/vector search yet.

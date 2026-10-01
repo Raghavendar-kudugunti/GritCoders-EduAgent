@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import datetime, timezone
 from hashlib import sha256
 from html.parser import HTMLParser
 from typing import Annotated
@@ -10,9 +11,20 @@ from pydantic import BaseModel, Field
 
 from backend.auth import current_user_id
 from backend.curriculum import CONCEPTS, TRACKS, get_concept, get_track_concepts, topic_catalog
-from backend.database import DiagnosticRecord, LearnerRecord, PracticeRecord, TutorDocumentRecord, TutorMessageRecord, get_db
+from backend.database import (
+    DiagnosticRecord,
+    LearnerRecord,
+    PeerConversationMemberRecord,
+    PeerConversationRecord,
+    PeerMessageRecord,
+    PracticeRecord,
+    TutorDocumentRecord,
+    TutorMessageRecord,
+    get_db,
+)
+from backend.lesson_extras import enrich_lesson
 from backend.tutor_routing import answer_tutor_question
-from backend.workflows import complete, generate_lesson, generate_onboarding_questions
+from backend.workflows import complete, enrich_practice, generate_lesson, generate_onboarding_questions
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user_id)])
@@ -114,11 +126,25 @@ class Diagnostic(BaseModel):
 class PracticeCompletion(BaseModel):
     promptId: str
     answer: str
+    activityId: str | None = None
 
 
 class TutorMessage(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     topic: str | None = None
+
+
+class TutorTopicContext(BaseModel):
+    topic: str = Field(min_length=1, max_length=160)
+
+
+class PeerConversationCreate(BaseModel):
+    memberIds: list[str] = Field(min_length=1, max_length=19)
+    name: str | None = Field(default=None, max_length=120)
+
+
+class PeerMessageInput(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
 
 
 class _HTMLText(HTMLParser):
@@ -181,7 +207,7 @@ def daily_practice(user_id: Annotated[str, Depends(current_user_id)], db: Sessio
     record = learner(db, user_id)
     current = next((item for item in record.learning_path if item.get("status") == "current"), None)
     if current is None:
-        return practice_prompt
+        return enrich_practice(practice_prompt, {"title": practice_prompt["topic"]})
     prompt = current.get("practicePrompt")
     if prompt is None:
         prompt = complete("practice_prompt", {
@@ -189,9 +215,12 @@ def daily_practice(user_id: Annotated[str, Depends(current_user_id)], db: Sessio
             "level": record.profile.get("level", "beginner"),
             "focus": record.profile.get("focus", "fundamentals"),
         })
-        current["practicePrompt"] = prompt
+    enriched_prompt = enrich_practice(prompt, current)
+    if enriched_prompt != prompt:
+        current["practicePrompt"] = enriched_prompt
         record.learning_path = deepcopy(record.learning_path)
         db.commit()
+    prompt = enriched_prompt
     return {
         **prompt,
         "id": f"{current['id']}-practice",
@@ -266,7 +295,7 @@ def get_lesson(concept_id: str, user_id: Annotated[str, Depends(current_user_id)
     lesson = node.get("lessonContent") if in_path else record.profile.get("exploredLessons", {}).get(concept_id)
     if lesson is None:
         lesson = generate_lesson({
-            "concept": {key: node.get(key) for key in ("title", "category", "description")},
+            "concept": {key: node.get(key) for key in ("id", "title", "category", "trackId", "description")},
             "learner": {
                 "level": record.profile.get("level", "beginner"),
                 "role": record.profile.get("role", "curious"),
@@ -283,7 +312,17 @@ def get_lesson(concept_id: str, user_id: Annotated[str, Depends(current_user_id)
                 **record.profile,
                 "exploredLessons": {**record.profile.get("exploredLessons", {}), concept_id: lesson},
             }
-        db.commit()
+    else:
+        lesson = enrich_lesson(node, lesson)
+    if in_path:
+        node["lessonContent"] = lesson
+        record.learning_path = path
+    else:
+        record.profile = {
+            **record.profile,
+            "exploredLessons": {**record.profile.get("exploredLessons", {}), concept_id: lesson},
+        }
+    db.commit()
     return {"conceptId": concept_id, "title": node["title"], **lesson}
 
 
@@ -329,12 +368,43 @@ def complete_lesson(concept_id: str, user_id: Annotated[str, Depends(current_use
 @router.post("/practice/complete")
 def complete_practice(body: PracticeCompletion, user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
     data = learner(db, user_id)
-    active_practice = next(
-        (item.get("practicePrompt") for item in data.learning_path if f"{item.get('id')}-practice" == body.promptId),
-        practice_prompt,
+    matching_node = next(
+        (item for item in data.learning_path if f"{item.get('id')}-practice" == body.promptId),
+        None,
     )
+    if matching_node is not None:
+        active_practice = matching_node.get("practicePrompt")
+        if not isinstance(active_practice, dict) or not active_practice.get("prompt"):
+            active_practice = complete("practice_prompt", {
+                "concept": {"title": matching_node.get("title", "this concept"), "description": matching_node.get("description", "")},
+                "level": data.profile.get("level", "beginner"),
+                "focus": data.profile.get("focus", "fundamentals"),
+            })
+            matching_node["practicePrompt"] = active_practice
+            data.learning_path = deepcopy(data.learning_path)
+            db.commit()
+        active_practice = enrich_practice(active_practice, matching_node)
+        selected_activity = next(
+            (item for item in active_practice.get("activities", []) if item.get("id") == body.activityId),
+            None,
+        ) if body.activityId else None
+        if body.activityId and selected_activity is None:
+            raise HTTPException(status_code=404, detail="Practice activity not found. Refresh today's practice and try again.")
+    elif body.promptId == practice_prompt["id"]:
+        active_practice = practice_prompt
+        active_practice = enrich_practice(active_practice, {"title": practice_prompt["topic"]})
+        selected_activity = next(
+            (item for item in active_practice["activities"] if item["id"] == body.activityId),
+            None,
+        ) if body.activityId else None
+        if body.activityId and selected_activity is None:
+            raise HTTPException(status_code=404, detail="Practice activity not found. Refresh today's practice and try again.")
+    else:
+        raise HTTPException(status_code=404, detail="Practice question not found. Refresh today's practice and try again.")
+
     result = complete("practice", {
-        "prompt": active_practice["prompt"],
+        "prompt": selected_activity["prompt"] if selected_activity else active_practice["prompt"],
+        "activity": selected_activity or {"type": "multiple_choice"},
         "answer": body.answer,
         "level": data.profile.get("level", "beginner"),
         "focus": data.profile.get("focus", "fundamentals"),
@@ -342,20 +412,171 @@ def complete_practice(body: PracticeCompletion, user_id: Annotated[str, Depends(
     # Practice contributes study time and feedback, while path progress changes
     # only when the learner completes a lesson.
     data.dashboard = {**data.dashboard, "weeklyMinutes": data.dashboard["weeklyMinutes"] + 5, "streakDays": data.dashboard["streakDays"] + 1}
-    db.add(PracticeRecord(user_id=user_id, prompt_id=body.promptId, answer=body.answer, correct=bool(result["correct"]), score_percent=int(result["scorePercent"]), feedback=result["feedback"], next_step=result["nextStep"]))
+    saved_prompt_id = f"{body.promptId}:{body.activityId}" if body.activityId else body.promptId
+    db.add(PracticeRecord(user_id=user_id, prompt_id=saved_prompt_id, answer=body.answer, correct=bool(result["correct"]), score_percent=int(result["scorePercent"]), feedback=result["feedback"], next_step=result["nextStep"]))
     db.commit()
     return result
 
 
 @router.get("/peers")
-def get_peers():
-    return [{"id": "maya", "name": "Maya Chen", "role": "Product designer", "focus": "AI literacy", "level": "Exploring", "matchPercent": 94, "initials": "MC", "accent": "orange"}, {"id": "jonas", "name": "Jonas Berg", "role": "Software engineer", "focus": "RAG systems", "level": "Building", "matchPercent": 87, "initials": "JB", "accent": "purple"}, {"id": "amira", "name": "Amira Patel", "role": "Student", "focus": "ML foundations", "level": "Learning", "matchPercent": 81, "initials": "AP", "accent": "teal"}]
+def get_peers(user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    current = learner(db, user_id)
+    learners = db.query(LearnerRecord).all()
+    current_focus = {
+        str(value).strip().lower()
+        for value in [current.profile.get("focus"), current.dashboard.get("currentTopicLabel"), *(current.profile.get("focusAreas") or [])]
+        if value
+    }
+    colors = ["#dce9e0", "#fae4bf", "#e5e3f5", "#d8eceb"]
+    peers = []
+    for candidate in learners:
+        name = str(candidate.profile.get("userName", "")).strip()
+        if candidate.user_id == user_id or not name:
+            continue
+        candidate_focus = {
+            str(value).strip().lower()
+            for value in [candidate.profile.get("focus"), candidate.dashboard.get("currentTopicLabel"), *(candidate.profile.get("focusAreas") or [])]
+            if value
+        }
+        overlap = current_focus.intersection(candidate_focus)
+        match = min(99, 65 + 12 * len(overlap))
+        if current.profile.get("role") and current.profile.get("role") == candidate.profile.get("role"):
+            match = min(99, match + 5)
+        initials = "".join(part[0] for part in name.split()[:2]).upper()
+        peers.append({
+            "id": sha256(candidate.user_id.encode()).hexdigest()[:32],
+            "name": name,
+            "role": candidate.profile.get("role", "Learner"),
+            "focus": candidate.dashboard.get("currentTopicLabel") or candidate.profile.get("focus", "Exploring AI"),
+            "level": candidate.profile.get("level", "Learning"),
+            "matchPercent": match,
+            "initials": initials,
+            "accent": colors[int(sha256(candidate.user_id.encode()).hexdigest()[:2], 16) % len(colors)],
+        })
+    return sorted(peers, key=lambda peer: (-peer["matchPercent"], peer["name"].lower()))
+
+
+def _peer_directory(db: Session) -> dict[str, LearnerRecord]:
+    return {
+        sha256(record.user_id.encode()).hexdigest()[:32]: record
+        for record in db.query(LearnerRecord).all()
+        if str(record.profile.get("userName", "")).strip()
+    }
+
+
+def _peer_name(record: LearnerRecord | None) -> str:
+    return str(record.profile.get("userName", "Learner")).strip() if record else "Learner"
+
+
+def _conversation_members(db: Session, conversation_id: str) -> list[str]:
+    return [row.user_id for row in db.query(PeerConversationMemberRecord).filter_by(conversation_id=conversation_id).all()]
+
+
+def _require_conversation_member(db: Session, conversation_id: str, user_id: str) -> PeerConversationRecord:
+    conversation = db.get(PeerConversationRecord, conversation_id)
+    is_member = db.query(PeerConversationMemberRecord).filter_by(conversation_id=conversation_id, user_id=user_id).first()
+    if not conversation or not is_member:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
+
+
+@router.get("/peers/conversations")
+def list_peer_conversations(user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    memberships = db.query(PeerConversationMemberRecord).filter_by(user_id=user_id).all()
+    result = []
+    for membership in memberships:
+        conversation = db.get(PeerConversationRecord, membership.conversation_id)
+        if not conversation:
+            continue
+        member_ids = _conversation_members(db, conversation.id)
+        members = [db.get(LearnerRecord, member_id) for member_id in member_ids]
+        others = [_peer_name(member) for member in members if member and member.user_id != user_id]
+        latest = db.query(PeerMessageRecord).filter_by(conversation_id=conversation.id).order_by(PeerMessageRecord.created_at.desc(), PeerMessageRecord.id.desc()).first()
+        result.append({
+            "id": conversation.id,
+            "name": conversation.name or (", ".join(others) if conversation.is_group else (others[0] if others else "Conversation")),
+            "isGroup": conversation.is_group,
+            "members": [{"id": sha256(member.user_id.encode()).hexdigest()[:32], "name": _peer_name(member)} for member in members if member],
+            "lastMessage": latest.body if latest else "Start the conversation",
+            "updatedAt": (latest.created_at if latest else conversation.updated_at).isoformat() if (latest.created_at if latest else conversation.updated_at) else None,
+        })
+    return sorted(result, key=lambda item: item["updatedAt"] or "", reverse=True)
+
+
+@router.post("/peers/conversations")
+def create_peer_conversation(body: PeerConversationCreate, user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    requested_ids = list(dict.fromkeys(body.memberIds))
+    directory = _peer_directory(db)
+    if any(peer_id not in directory for peer_id in requested_ids):
+        raise HTTPException(status_code=404, detail="One or more learners are no longer available")
+    participant_ids = {user_id, *(directory[peer_id].user_id for peer_id in requested_ids)}
+    if len(participant_ids) < 2:
+        raise HTTPException(status_code=422, detail="Choose at least one other learner")
+    if len(participant_ids) > 20:
+        raise HTTPException(status_code=422, detail="A peer group can have up to 20 members")
+    is_group = len(participant_ids) > 2
+    if not is_group:
+        for membership in db.query(PeerConversationMemberRecord).filter_by(user_id=user_id).all():
+            existing_members = set(_conversation_members(db, membership.conversation_id))
+            conversation = db.get(PeerConversationRecord, membership.conversation_id)
+            if conversation and not conversation.is_group and existing_members == participant_ids:
+                other_user_id = next(iter(participant_ids - {user_id}))
+                return {"id": conversation.id, "name": _peer_name(db.get(LearnerRecord, other_user_id)), "isGroup": False}
+    conversation = PeerConversationRecord(
+        id=str(uuid4()), created_by=user_id, name=body.name.strip() if is_group and body.name and body.name.strip() else None,
+        is_group=is_group,
+    )
+    db.add(conversation)
+    # Persist the referenced row before adding its member rows. There is no ORM
+    # relationship between these models, so make the foreign-key insert order explicit.
+    db.flush()
+    for member_id in participant_ids:
+        db.add(PeerConversationMemberRecord(conversation_id=conversation.id, user_id=member_id))
+    db.commit()
+    return {"id": conversation.id, "name": conversation.name or "Group conversation", "isGroup": conversation.is_group}
+
+
+@router.get("/peers/conversations/{conversation_id}/messages")
+def get_peer_messages(conversation_id: str, user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    _require_conversation_member(db, conversation_id, user_id)
+    records = list(reversed(db.query(PeerMessageRecord).filter_by(conversation_id=conversation_id).order_by(PeerMessageRecord.created_at.desc(), PeerMessageRecord.id.desc()).limit(500).all()))
+    names = {member_id: _peer_name(db.get(LearnerRecord, member_id)) for member_id in _conversation_members(db, conversation_id)}
+    return [{
+        "id": str(message.id), "senderId": sha256(message.sender_id.encode()).hexdigest()[:32],
+        "senderName": names.get(message.sender_id, "Learner"), "isMine": message.sender_id == user_id, "body": message.body,
+        "createdAt": message.created_at.isoformat() if message.created_at else None,
+    } for message in records]
+
+
+@router.post("/peers/conversations/{conversation_id}/messages")
+def send_peer_message(conversation_id: str, body: PeerMessageInput, user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    conversation = _require_conversation_member(db, conversation_id, user_id)
+    message_text = body.body.strip()
+    if not message_text:
+        raise HTTPException(status_code=422, detail="Enter a message before sending")
+    message = PeerMessageRecord(conversation_id=conversation_id, sender_id=user_id, body=message_text)
+    conversation.updated_at = datetime.now(timezone.utc)
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return {"id": str(message.id), "senderId": sha256(user_id.encode()).hexdigest()[:32], "senderName": _peer_name(db.get(LearnerRecord, user_id)), "isMine": True, "body": message.body, "createdAt": message.created_at.isoformat() if message.created_at else None}
+
+
+@router.put("/tutor/context")
+def save_tutor_context(body: TutorTopicContext, user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
+    record = learner(db, user_id)
+    topic = body.topic.strip()
+    if not topic:
+        raise HTTPException(status_code=422, detail="Enter a topic to use as tutor context.")
+    record.profile = {**record.profile, "tutorTopic": topic}
+    db.commit()
+    return {"topic": topic}
 
 
 @router.post("/tutor/message")
 def tutor_message(body: TutorMessage, user_id: Annotated[str, Depends(current_user_id)], db: Session = Depends(get_db)):
     profile = learner(db, user_id)
-    topic = body.topic or profile.dashboard.get("currentTopicLabel") or profile.dashboard.get("currentTopic", "")
+    topic = body.topic or profile.profile.get("tutorTopic") or profile.dashboard.get("currentTopicLabel") or profile.dashboard.get("currentTopic", "")
     documents = db.query(TutorDocumentRecord).filter_by(user_id=user_id).order_by(TutorDocumentRecord.created_at.desc()).all()
     result = answer_tutor_question(
         question=body.message,

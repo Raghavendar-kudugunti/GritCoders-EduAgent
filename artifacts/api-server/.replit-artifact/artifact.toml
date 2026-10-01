@@ -1,0 +1,32 @@
+kind = "api"
+previewPath = "/api" # TODO - should be excluded from preview in the first place
+title = "API Server"
+version = "1.0.0"
+id = "3B4_FFSkEVBkAeYMFRJ2e"
+
+[[services]]
+localPort = 5000
+name = "API Server"
+paths = ["/api"]
+
+[services.development]
+run = "uvicorn backend.main:app --host 0.0.0.0 --port 5000"
+
+[services.production]
+
+[services.production.build]
+args = ["python", "-m", "pip", "install", "-r", "requirements.txt"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+# we don't run through pnpm to make startup faster in production
+args = ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "5000"]
+
+[services.production.run.env]
+PORT = "5000"
+NODE_ENV = "production"
+
+[services.production.health.startup]
+path = "/api/healthz"

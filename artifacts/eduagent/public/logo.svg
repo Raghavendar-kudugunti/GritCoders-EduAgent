@@ -1,0 +1,7 @@
+<svg width="180" height="48" viewBox="0 0 180 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" rx="14" fill="#D8E58B"/>
+  <circle cx="38" cy="10" r="9" stroke="#2D716B" stroke-width="2.5"/>
+  <path d="M15.5 24.5C15.5 19.8056 19.3056 16 24 16C28.6944 16 32.5 19.8056 32.5 24.5C32.5 29.1944 28.6944 33 24 33C19.3056 33 15.5 29.1944 15.5 24.5Z" stroke="#233039" stroke-width="2.5"/>
+  <path d="M20 24.5H28M24 20.5V28.5M15.8 20.6L12.7 18.8M32.2 20.6L35.3 18.8M15.8 28.4L12.7 30.2M32.2 28.4L35.3 30.2" stroke="#233039" stroke-width="2.2" stroke-linecap="round"/>
+  <text x="60" y="31" fill="#233039" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="-1">EduAgent</text>
+</svg>

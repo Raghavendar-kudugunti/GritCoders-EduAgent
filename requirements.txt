@@ -1,0 +1,10 @@
+langgraph
+openai
+pydantic
+python-dotenv
+fastapi
+uvicorn
+PyJWT[crypto]
+httpx
+SQLAlchemy>=2.0
+psycopg[binary]>=3.2

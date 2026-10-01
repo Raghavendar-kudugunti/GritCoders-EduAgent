@@ -1,0 +1,545 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: learning
+    description: Learner dashboard and adaptive curriculum operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [learning]
+      summary: Get the learner dashboard
+      responses:
+        "200":
+          description: Dashboard overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /profile:
+    get:
+      operationId: getLearnerProfile
+      tags: [learning]
+      summary: Get the signed-in learner profile and onboarding status
+      responses:
+        "200":
+          description: Learner profile and onboarding status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearnerProfileStatus"
+  /learning-path:
+    get:
+      operationId: getLearningPath
+      tags: [learning]
+      summary: Get the adaptive learning path
+      responses:
+        "200":
+          description: Ordered learning path nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LearningPathNode"
+  /topics:
+    get:
+      operationId: getTopics
+      tags: [learning]
+      summary: List AI learning topics
+      responses:
+        "200":
+          description: AI topic catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Topic"
+  /topics/{track_id}/concepts:
+    get:
+      operationId: getTopicConcepts
+      tags: [learning]
+      summary: List concepts and progress for a curriculum track
+      parameters:
+        - in: path
+          name: track_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Concepts in the curriculum track
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopicConcept"
+  /daily-practice:
+    get:
+      operationId: getDailyPractice
+      tags: [learning]
+      summary: Get today's practice prompt
+      responses:
+        "200":
+          description: Daily practice prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticePrompt"
+  /diagnostic/submit:
+    post:
+      operationId: submitDiagnostic
+      tags: [learning]
+      summary: Submit an answer from the adaptive diagnostic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiagnosticInput"
+      responses:
+        "200":
+          description: Updated learner evaluation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticResult"
+  /onboarding/complete:
+    post:
+      operationId: completeOnboarding
+      tags: [learning]
+      summary: Complete learner onboarding and generate a path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingInput"
+      responses:
+        "200":
+          description: Personalized learner path summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResult"
+  /onboarding/questions:
+    post:
+      operationId: createOnboardingQuestions
+      tags: [learning]
+      summary: Create diagnostic questions for a learner's chosen focus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingProfileInput"
+      responses:
+        "200":
+          description: Focus-specific diagnostic questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingQuestions"
+  /learning-path/{concept_id}/lesson:
+    get:
+      operationId: getPathLesson
+      tags: [learning]
+      summary: Get a level-adapted lesson for a concept in the learner's path
+      parameters:
+        - in: path
+          name: concept_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Personalized lesson content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lesson"
+  /learning-path/{concept_id}/complete:
+    post:
+      operationId: completePathLesson
+      tags: [learning]
+      summary: Save lesson completion and advance the learner's path
+      parameters:
+        - in: path
+          name: concept_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updated learner path and dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningPathCompletion"
+  /practice/complete:
+    post:
+      operationId: completePractice
+      tags: [learning]
+      summary: Complete the daily practice prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PracticeCompletionInput"
+      responses:
+        "200":
+          description: Practice result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeResult"
+  /peers:
+    get:
+      operationId: getPeers
+      tags: [learning]
+      summary: Find learners studying related AI topics
+      responses:
+        "200":
+          description: Suggested peer matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Peer"
+  /tutor/message:
+    post:
+      operationId: sendTutorMessage
+      tags: [learning]
+      summary: Ask the EduAgent tutor a question
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TutorMessageInput"
+      responses:
+        "200":
+          description: Tutor reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TutorMessage"
+  /tutor/documents:
+    get:
+      operationId: listTutorDocuments
+      tags: [learning]
+      summary: List the signed-in learner's tutor documents
+      responses:
+        "200":
+          description: Uploaded tutor documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TutorDocument" }
+    post:
+      operationId: uploadTutorDocument
+      tags: [learning]
+      summary: Upload a private tutor document
+      parameters:
+        - in: header
+          name: X-Filename
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Stored tutor document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TutorDocument" }
+  /tutor/documents/{document_id}:
+    delete:
+      operationId: deleteTutorDocument
+      tags: [learning]
+      summary: Delete a private tutor document
+      parameters:
+        - in: path
+          name: document_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Document removed
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Dashboard:
+      type: object
+      required: [learnerName, greeting, currentTopic, progressPercent, streakDays, weeklyMinutes, completedTopics, totalTopics, nextAction, weeklyActivity]
+      properties:
+        learnerName: { type: string }
+        greeting: { type: string }
+        currentTopic: { type: string }
+        currentTopicLabel: { type: string }
+        progressPercent: { type: integer }
+        streakDays: { type: integer }
+        weeklyMinutes: { type: integer }
+        completedTopics: { type: integer }
+        totalTopics: { type: integer }
+        nextAction: { type: string }
+        weeklyActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityDay"
+        focusAreas:
+          type: array
+          items: { type: string }
+    LearnerProfileStatus:
+      type: object
+      required: [onboardingComplete, profile]
+      properties:
+        onboardingComplete: { type: boolean }
+        profile:
+          type: object
+          properties:
+            userName: { type: string }
+            gender: { type: string }
+            ageGroup: { type: string }
+            role: { type: string }
+            focus: { type: string }
+    ActivityDay:
+      type: object
+      required: [day, minutes]
+      properties:
+        day: { type: string }
+        minutes: { type: integer }
+        isToday: { type: boolean }
+    LearningPathNode:
+      type: object
+      required: [id, title, category, description, status, durationMinutes, order]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        category: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [completed, current, upcoming, locked] }
+        durationMinutes: { type: integer }
+        order: { type: integer }
+        accent: { type: string }
+        confidence: { type: integer }
+        fitNote: { type: string }
+        elective: { type: boolean }
+        lessonContent:
+          $ref: "#/components/schemas/LessonContent"
+    OnboardingProfileInput:
+      type: object
+      required: [role, ageGroup, focus]
+      properties:
+        role: { type: string }
+        ageGroup: { type: string }
+        focus: { type: string }
+    OnboardingQuestions:
+      type: object
+      required: [questions]
+      properties:
+        questions:
+          type: array
+          items:
+            type: object
+            required: [prompt, options]
+            properties:
+              prompt: { type: string }
+              options:
+                type: array
+                items:
+                  type: object
+                  required: [label, correct]
+                  properties:
+                    label: { type: string }
+                    correct: { type: boolean }
+    Lesson:
+      allOf:
+        - $ref: "#/components/schemas/LessonContent"
+        - type: object
+          required: [conceptId, title]
+          properties:
+            conceptId: { type: string }
+            title: { type: string }
+    LessonContent:
+      type: object
+      required: [objective, explanation, keyIdeas, workedExample, practiceQuestion, checkAnswer]
+      properties:
+        objective: { type: string }
+        explanation: { type: string }
+        keyIdeas:
+          type: array
+          items: { type: string }
+        workedExample: { type: string }
+        practiceQuestion: { type: string }
+        checkAnswer: { type: string }
+    LearningPathCompletion:
+      type: object
+      required: [learningPath, dashboard]
+      properties:
+        learningPath:
+          type: array
+          items: { $ref: "#/components/schemas/LearningPathNode" }
+        dashboard: { $ref: "#/components/schemas/Dashboard" }
+    Topic:
+      type: object
+      required: [id, title, category, description, lessonCount, color]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        category: { type: string }
+        description: { type: string }
+        lessonCount: { type: integer }
+        color: { type: string }
+        progressPercent: { type: integer }
+    TopicConcept:
+      type: object
+      required: [id, title, category, description, durationMinutes, status]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        category: { type: string }
+        description: { type: string }
+        durationMinutes: { type: integer }
+        status: { type: string }
+    PracticePrompt:
+      type: object
+      required: [id, topic, title, prompt, options, minutes, difficulty]
+      properties:
+        id: { type: string }
+        topic: { type: string }
+        title: { type: string }
+        prompt: { type: string }
+        options:
+          type: array
+          items: { type: string }
+        minutes: { type: integer }
+        difficulty: { type: string }
+    DiagnosticInput:
+      type: object
+      required: [topic, answer, claimedLevel]
+      properties:
+        topic: { type: string }
+        answer: { type: string }
+        claimedLevel: { type: string }
+    DiagnosticResult:
+      type: object
+      required: [evaluatedLevel, accuracyPercent, strengths, focusAreas, message]
+      properties:
+        evaluatedLevel: { type: string }
+        accuracyPercent: { type: integer }
+        strengths:
+          type: array
+          items: { type: string }
+        focusAreas:
+          type: array
+          items: { type: string }
+        message: { type: string }
+    OnboardingInput:
+      type: object
+      required: [userName, gender, ageGroup, role, focus, answers]
+      properties:
+        userName: { type: string }
+        gender: { type: string }
+        ageGroup: { type: string }
+        role: { type: string }
+        focus: { type: string }
+        answers:
+          type: array
+          items: { type: string }
+    OnboardingResult:
+      type: object
+      required: [evaluatedLevel, accuracyPercent, focusLabel, pathSummary, message]
+      properties:
+        evaluatedLevel: { type: string }
+        accuracyPercent: { type: integer }
+        focusLabel: { type: string }
+        pathSummary: { type: string }
+        message: { type: string }
+    PracticeCompletionInput:
+      type: object
+      required: [promptId, answer]
+      properties:
+        promptId: { type: string }
+        answer: { type: string }
+    PracticeResult:
+      type: object
+      required: [correct, scorePercent, feedback, nextStep]
+      properties:
+        correct: { type: boolean }
+        scorePercent: { type: integer }
+        feedback: { type: string }
+        nextStep: { type: string }
+    Peer:
+      type: object
+      required: [id, name, role, focus, level, matchPercent, initials, accent]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string }
+        focus: { type: string }
+        level: { type: string }
+        matchPercent: { type: integer }
+        initials: { type: string }
+        accent: { type: string }
+    TutorMessageInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        topic: { type: ["string", "null"] }
+    TutorMessage:
+      type: object
+      required: [reply, topic, suggestedPrompt]
+      properties:
+        reply: { type: string }
+        topic: { type: string }
+        suggestedPrompt: { type: string }
+        route: { type: string, enum: [graph_rag, standard_rag] }
+        citations:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              relation: { type: string }
+    TutorDocument:
+      type: object
+      required: [id, filename]
+      properties:
+        id: { type: string }
+        filename: { type: string }
+        createdAt: { type: [string, "null"], format: date-time }

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "EduAgent"
+description = "An adaptive learning companion for anyone learning AI, from foundational concepts and math through machine learning, generative AI, agents, and MLOps."
+version = "1.0.0"
+id = "artifacts/eduagent"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22048
+
+[services.development]
+run = "pnpm --filter @workspace/eduagent run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/eduagent", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/eduagent/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22048"
+BASE_PATH = "/"

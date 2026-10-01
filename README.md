@@ -1,28 +1,71 @@
-# EduAgent
+# <img src="artifacts/eduagent/public/logo.svg" alt="" width="38" align="top" /> EduAgent
 
-EduAgent is an adaptive AI learning app. Learners choose a focus, complete a short diagnostic, and get a saved learning path with interactive lessons and practice. The tutor routes conceptual questions through connected curriculum concepts and can search a learner's uploaded notes.
+<div align="center">
 
-## Features
+### Learn AI from where you are.
 
-- React learning app with sign-in, onboarding, dashboard, adaptive path, practice, topic map, and tutor.
-- FastAPI backend organized around LangGraph workflows.
-- PostgreSQL persistence for learner profiles, paths, lesson completion, practice, tutor messages, and private tutor documents. Tables are created automatically when the backend starts.
-- Peer matching uses signed-in learners' saved interests and learning progress. Direct and group conversations are stored in PostgreSQL and refresh while the chat is open.
-- Personalized curriculum covering AI foundations, Python, machine learning, deep learning, generative AI, RAG, data engineering, and MLOps.
-- Lesson pages combine a visual concept flow, short explanation, code example where relevant, a mini project, and topic-matched video/course links.
-- Tutor routing: conceptual/comparison/path questions use graph-style retrieval over the curriculum; fact checks and document lookups use keyword-based retrieval over the learner's uploaded files.
-- The learner's selected tutor topic is saved to their profile and reused as answer and retrieval context.
-- Uploads support TXT, Markdown, CSV, and HTML files up to 5 MB each. Documents are private to the signed-in account.
+An adaptive AI tutor that turns your goals and starting knowledge into a learning path you can actually follow—from Python and machine learning to generative AI, RAG, and MLOps.
 
-The tutor does not have live web search. Its GraphRAG-style route uses the app's connected curriculum catalog, and its document route searches uploaded files. It does not use a separate graph database or embedding/vector search yet.
+[![CI](https://github.com/Raghavendar-kudugunti/GritCoders-EduAgent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Raghavendar-kudugunti/GritCoders-EduAgent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-9fbd45.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?logo=python&logoColor=white)
+![Frontend](https://img.shields.io/badge/Frontend-React-149ECA?logo=react&logoColor=white)
 
-## Tech stack
+<br />
 
-- Frontend: React, TypeScript, Vite, TanStack Query, Clerk
-- Backend: Python, FastAPI, LangGraph, SQLAlchemy
-- Database: PostgreSQL
-- Language model: OpenAI-compatible chat completions API (the sample configuration uses Groq)
-- Workspace: pnpm monorepo
+[Get started](#quick-start) · [How it works](#how-it-works) · [Evaluate the learner paths](#adaptive-learning-and-evaluation) · [Contribute](#contributing)
+
+</div>
+
+## A learning path that adapts
+
+Most learning plans begin with a fixed syllabus. EduAgent first asks what you want to learn and uses a short diagnostic to estimate your starting point. It then builds and saves a path around your focus, role, and prior knowledge. As you complete lessons and scored practice, later activities can adjust their level of support or challenge.
+
+| 🧭 Find your starting point | 🧠 Learn by doing | 💬 Ask with context | 🤝 Learn together |
+| --- | --- | --- | --- |
+| Short onboarding and a focus-specific path | Visual explanations, code, projects, and interactive practice | Curriculum-aware tutor plus search over your own notes | Match with signed-in learners and use direct or group chats |
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[Focus and diagnostic] --> B[LangGraph learning workflow]
+    B --> C[Personalized path]
+    C --> D[Lessons and practice]
+    D --> E[Scored progress]
+    E --> B
+    F[Tutor question] --> G{Intent router}
+    G -->|Concepts, comparisons, paths| H[Connected curriculum retrieval]
+    G -->|Facts and uploaded notes| I[Document search]
+    H --> J[LLM response]
+    I --> J
+```
+
+## What you can do
+
+- **Build a personal path:** explore AI foundations, Python, machine learning, deep learning, generative AI, retrieval-augmented generation, data engineering, and MLOps.
+- **Study a concept in different ways:** use visual concept flows, concise explanations, code examples, mini projects, and related learning resources.
+- **Practice interactively:** complete different practice activities; successfully scored attempts inform future lesson and practice difficulty. Unscored attempts do not affect score analytics.
+- **Ask a tutor:** conceptual, comparison, and path questions use connected curriculum concepts. Fact checks and document questions search notes uploaded by the learner.
+- **Study with peers:** find other signed-in learners through saved interests and progress, then continue in direct or group conversations.
+- **Track progress:** review scored-practice trends and completed learning activity in a PostgreSQL-backed profile.
+
+<details>
+<summary><strong>About tutor retrieval and uploaded files</strong></summary>
+
+The tutor's curriculum route is GraphRAG-style retrieval over the app's connected curriculum catalog. It does not use a separate graph database or embedding/vector search. The document route searches the current learner's uploaded TXT, Markdown, CSV, or HTML files (up to 5 MB each). The tutor does not have live web search. Uploaded documents are private to the signed-in account.
+
+</details>
+
+## Architecture
+
+| Layer | Technology |
+| --- | --- |
+| Web app | React, TypeScript, Vite, TanStack Query, Clerk |
+| API and agent workflows | Python, FastAPI, LangGraph |
+| Persistence | PostgreSQL, SQLAlchemy |
+| LLM provider | OpenAI-compatible chat completions API; sample settings use Groq, with optional Gemini failover |
+| Workspace | pnpm monorepo |
 
 ## Requirements
 
@@ -33,7 +76,9 @@ The tutor does not have live web search. Its GraphRAG-style route uses the app's
 - An LLM provider API key
 - A Clerk application for sign-in
 
-## Local setup on Windows PowerShell
+## Quick start
+
+### Windows PowerShell
 
 ### 1. Configure environment variables
 
@@ -137,22 +182,9 @@ lib/api-client-react/        React API client and generated hooks
 lib/db/                      Shared database workspace package
 ```
 
-## Before publishing to GitHub
+## Contributing
 
-1. Review `git status --short` and check every file you plan to include.
-2. Confirm `.env` is ignored with `git check-ignore -v .env`. Commit `.env.example`, never `.env`.
-3. Review local assets before staging. `attached_assets/Untitled_2_1790748909879.pdf` and the `screenshots/` images are not referenced by the app source; remove them from the commit if they contain private or unrelated material.
-4. Keep local state and generated caches out of the commit: `.venv/`, `node_modules/`, `.pnpm-store/`, `.uv-cache/`, `.agents/`, and `.conversation/` are ignored.
-5. Run the frontend typecheck/build and make sure the backend starts with a local PostgreSQL database and valid Clerk/LLM configuration.
-6. Inspect the staged file list and diff before committing:
-
-   ```powershell
-   git add README.md .gitignore .env.example .npmrc .replit .replitignore replit.md agent artifacts backend lib package.json pnpm-lock.yaml pnpm-workspace.yaml pyproject.toml requirements.txt scripts tsconfig.base.json tsconfig.json uv.lock
-   git diff --cached --name-only
-   git diff --cached
-   ```
-
-   Only stage `attached_assets/`, `screenshots/`, or other extra files if you intend to publish them. If a secret was ever committed, deleting it from the latest files is not enough; rotate the credential and remove it from Git history before publishing.
+Contributions are welcome. Open an issue to discuss a larger change, or submit a pull request with a focused description of what changed and how you checked it. The GitHub Actions workflow runs Python syntax checks and the frontend typecheck/build for pushes and pull requests to `main`.
 
 ## License
 
